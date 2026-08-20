@@ -2,25 +2,25 @@ package Web_Drink_Store.webstore.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 
 @Entity
-@Table(name = "order_items")
+@Table(name = "cart_items")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class OrderItem {
+public class CartItem {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "order_id")
-    private Order order;
+    @JoinColumn(name = "cart_id")
+    private Cart cart;
 
     @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
 
-    private String productName;
-    private BigDecimal price;
-    private Integer quantity;
+    @Builder.Default
+    private Integer quantity = 1;
+
     private String size;
+    private String note;
 }
