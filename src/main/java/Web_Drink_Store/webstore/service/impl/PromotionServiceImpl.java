@@ -1,13 +1,167 @@
 package Web_Drink_Store.webstore.service.impl;
-import Web_Drink_Store.webstore.dto.promotion.*; import Web_Drink_Store.webstore.entity.Promotion; import Web_Drink_Store.webstore.enums.PromotionStatus; import Web_Drink_Store.webstore.exception.*; import Web_Drink_Store.webstore.repository.PromotionRepository; import Web_Drink_Store.webstore.service.PromotionService; import org.springframework.stereotype.Service; import java.util.*;
+
+import Web_Drink_Store.webstore.dto.promotion.PromotionRequest;
+import Web_Drink_Store.webstore.dto.promotion.PromotionResponse;
+import Web_Drink_Store.webstore.entity.Promotion;
+import Web_Drink_Store.webstore.enums.PromotionStatus;
+import Web_Drink_Store.webstore.exception.BadRequestException;
+import Web_Drink_Store.webstore.exception.ResourceNotFoundException;
+import Web_Drink_Store.webstore.repository.PromotionRepository;
+import Web_Drink_Store.webstore.service.PromotionService;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
 @Service
 public class PromotionServiceImpl implements PromotionService {
-    private final PromotionRepository repo; public PromotionServiceImpl(PromotionRepository repo){this.repo=repo;}
-    private Promotion get(Long id){return repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy promotion"));}
-    private PromotionResponse map(Promotion p){return new PromotionResponse(p.getId(),p.getCode(),p.getName(),p.getDiscountType(),p.getDiscountValue(),p.getMinOrderValue(),p.getMaxDiscountValue(),p.getStartAt(),p.getEndAt(),p.getStatus());}
-    public List<PromotionResponse> getAll(){return repo.findAll().stream().map(this::map).toList();}
-    public PromotionResponse create(PromotionRequest r){if(repo.existsByCode(r.getCode()))throw new BadRequestException("Mã khuyến mãi đã tồn tại");Promotion p=new Promotion();fill(p,r);p.setStatus(PromotionStatus.ACTIVE);return map(repo.save(p));}
-    public PromotionResponse update(Long id,PromotionRequest r){Promotion p=get(id);fill(p,r);return map(repo.save(p));}
-    public void deactivate(Long id){Promotion p=get(id);p.setStatus(PromotionStatus.INACTIVE);repo.save(p);}
-    private void fill(Promotion p,PromotionRequest r){p.setCode(r.getCode());p.setName(r.getName());p.setDiscountType(r.getDiscountType());p.setDiscountValue(r.getDiscountValue());p.setMinOrderValue(r.getMinOrderValue());p.setMaxDiscountValue(r.getMaxDiscountValue());p.setStartAt(r.getStartAt());p.setEndAt(r.getEndAt());}
+
+    private final PromotionRepository promotionRepository;
+
+    public PromotionServiceImpl(PromotionRepository promotionRepository) {
+        this.promotionRepository = promotionRepository;
+    }
+
+    @Override
+    public List<PromotionResponse> getAll() {
+        return promotionRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    public PromotionResponse create(PromotionRequest request) {
+
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            throw new BadRequestException("Mã khuyến mãi không được để trống");
+        }
+
+        if (promotionRepository.existsByCode(request.getCode())) {
+            throw new BadRequestException("Mã khuyến mãi đã tồn tại");
+        }
+
+        validate(request);
+
+        Promotion promotion = new Promotion();
+
+        promotion.setCode(request.getCode());
+        promotion.setName(request.getName());
+        promotion.setDiscountType(request.getDiscountType());
+        promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderValue(request.getMinOrderValue());
+        promotion.setMaxDiscountValue(request.getMaxDiscountValue());
+        promotion.setStartAt(request.getStartAt());
+        promotion.setEndAt(request.getEndAt());
+        promotion.setStatus(PromotionStatus.ACTIVE);
+
+        promotionRepository.save(promotion);
+
+        return toResponse(promotion);
+    }
+
+    @Override
+    public PromotionResponse update(Long id, PromotionRequest request) {
+
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Không tìm thấy khuyến mãi"));
+
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            throw new BadRequestException("Mã khuyến mãi không được để trống");
+        }
+
+        promotionRepository.findByCode(request.getCode())
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(id)) {
+                        throw new BadRequestException(
+                                "Mã khuyến mãi đã tồn tại");
+                    }
+                });
+
+        validate(request);
+
+        promotion.setCode(request.getCode());
+        promotion.setName(request.getName());
+        promotion.setDiscountType(request.getDiscountType());
+        promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderValue(request.getMinOrderValue());
+        promotion.setMaxDiscountValue(request.getMaxDiscountValue());
+        promotion.setStartAt(request.getStartAt());
+        promotion.setEndAt(request.getEndAt());
+
+        promotionRepository.save(promotion);
+
+        return toResponse(promotion);
+    }
+
+    @Override
+    public void deactivate(Long id) {
+
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Không tìm thấy khuyến mãi"));
+
+        promotion.setStatus(PromotionStatus.INACTIVE);
+
+        promotionRepository.save(promotion);
+    }
+
+    private void validate(PromotionRequest request) {
+
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new BadRequestException(
+                    "Tên khuyến mãi không được để trống");
+        }
+
+        if (request.getDiscountType() == null) {
+            throw new BadRequestException(
+                    "Loại giảm giá không được để trống");
+        }
+
+        if (request.getDiscountValue() == null
+                || request.getDiscountValue().signum() <= 0) {
+
+            throw new BadRequestException(
+                    "Giá trị giảm phải lớn hơn 0");
+        }
+
+        if (request.getMinOrderValue() != null
+                && request.getMinOrderValue().signum() < 0) {
+
+            throw new BadRequestException(
+                    "Giá trị đơn hàng tối thiểu không được âm");
+        }
+
+        if (request.getMaxDiscountValue() != null
+                && request.getMaxDiscountValue().signum() < 0) {
+
+            throw new BadRequestException(
+                    "Mức giảm tối đa không được âm");
+        }
+
+        if (request.getStartAt() != null
+                && request.getEndAt() != null
+                && request.getEndAt()
+                .isBefore(request.getStartAt())) {
+
+            throw new BadRequestException(
+                    "Thời gian kết thúc phải sau thời gian bắt đầu");
+        }
+    }
+
+    private PromotionResponse toResponse(Promotion promotion) {
+
+        return new PromotionResponse(
+                promotion.getId(),
+                promotion.getCode(),
+                promotion.getName(),
+                promotion.getDiscountType(),
+                promotion.getDiscountValue(),
+                promotion.getMinOrderValue(),
+                promotion.getMaxDiscountValue(),
+                promotion.getStartAt(),
+                promotion.getEndAt(),
+                promotion.getStatus()
+        );
+    }
 }
