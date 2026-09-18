@@ -264,6 +264,24 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
+// USER XEM CHI TIẾT ĐƠN HÀNG
+
+    @Override
+    public OrderResponse getMyOrderById(
+            Long userId,
+            Long orderId
+    ) {
+
+        Order order = orders
+                .findByIdAndUserId(orderId, userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Không tìm thấy đơn hàng"
+                        )
+                );
+
+        return map(order);
+    }
     // =========================
     // ADMIN XEM TẤT CẢ ORDER
     // =========================
