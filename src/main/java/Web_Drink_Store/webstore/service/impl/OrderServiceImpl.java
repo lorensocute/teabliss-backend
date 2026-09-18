@@ -197,6 +197,7 @@ public class OrderServiceImpl implements OrderService {
         order.setAddress(address);
         order.setPromotion(promotion);
         order.setStatus(OrderStatus.PENDING);
+        order.setPaymentMethod(PaymentMethod.COD);
         order.setSubtotal(subtotal);
         order.setDiscountAmount(discount);
         order.setTotalAmount(
@@ -379,6 +380,7 @@ public class OrderServiceImpl implements OrderService {
         return new OrderResponse(
                 order.getId(),
                 order.getStatus(),
+                order.getPaymentMethod(),
                 order.getSubtotal(),
                 order.getDiscountAmount(),
                 order.getTotalAmount(),
