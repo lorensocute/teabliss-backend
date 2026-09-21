@@ -4,7 +4,7 @@ import Web_Drink_Store.webstore.enums.OrderStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+import Web_Drink_Store.webstore.enums.PaymentMethod;
 @Entity
 @Table(name = "orders")
 public class Order {
@@ -26,6 +26,10 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod = PaymentMethod.COD;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
@@ -58,4 +62,8 @@ public class Order {
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-}
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;}
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }}
