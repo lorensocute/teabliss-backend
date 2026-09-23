@@ -21,7 +21,6 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orders;
     private final OrderItemRepository orderItems;
     private final UserRepository users;
-    private final AddressRepository addresses;
     private final CartRepository carts;
     private final CartItemRepository cartItems;
     private final ProductRepository products;
@@ -31,7 +30,6 @@ public class OrderServiceImpl implements OrderService {
             OrderRepository orders,
             OrderItemRepository orderItems,
             UserRepository users,
-            AddressRepository addresses,
             CartRepository carts,
             CartItemRepository cartItems,
             ProductRepository products,
@@ -40,7 +38,6 @@ public class OrderServiceImpl implements OrderService {
         this.orders = orders;
         this.orderItems = orderItems;
         this.users = users;
-        this.addresses = addresses;
         this.carts = carts;
         this.cartItems = cartItems;
         this.products = products;
@@ -58,13 +55,21 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Không tìm thấy user"));
 
-        Address address = addresses.findById(request.getAddressId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy địa chỉ"));
-
-        if (!address.getUser().getId().equals(userId)) {
-            throw new UnauthorizedException("Địa chỉ không thuộc user");
+        if (request.getReceiverName() == null
+                || request.getReceiverName().isBlank()) {
+            throw new BadRequestException("Tên người nhận không được để trống");
         }
+
+        if (request.getReceiverPhone() == null
+                || request.getReceiverPhone().isBlank()) {
+            throw new BadRequestException("Số điện thoại không được để trống");
+        }
+
+        if (request.getShippingAddress() == null
+                || request.getShippingAddress().isBlank()) {
+            throw new BadRequestException("Địa chỉ giao hàng không được để trống");
+        }
+
 
         Cart cart = carts.findByUserId(userId)
                 .orElseThrow(() ->
@@ -194,15 +199,15 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
 
         order.setUser(user);
-        order.setAddress(address);
         order.setPromotion(promotion);
         order.setStatus(OrderStatus.PENDING);
         order.setPaymentMethod(PaymentMethod.COD);
         order.setSubtotal(subtotal);
         order.setDiscountAmount(discount);
-        order.setTotalAmount(
-                subtotal.subtract(discount)
-        );
+        order.setTotalAmount(subtotal.subtract(discount));
+        order.setReceiverName(request.getReceiverName());
+        order.setReceiverPhone(request.getReceiverPhone());
+        order.setShippingAddress(request.getShippingAddress());
 
         orders.save(order);
 
@@ -381,6 +386,9 @@ public class OrderServiceImpl implements OrderService {
                 order.getId(),
                 order.getStatus(),
                 order.getPaymentMethod(),
+                order.getReceiverName(),
+                order.getReceiverPhone(),
+                order.getShippingAddress(),
                 order.getSubtotal(),
                 order.getDiscountAmount(),
                 order.getTotalAmount(),

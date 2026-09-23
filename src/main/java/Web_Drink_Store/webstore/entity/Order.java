@@ -15,10 +15,6 @@ public class Order {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "address_id", nullable = false)
-    private Address address;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "promotion_id")
     private Promotion promotion;
@@ -43,14 +39,21 @@ public class Order {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "receiver_name", nullable = false)
+    private String receiverName;
+
+    @Column(name = "receiver_phone", nullable = false)
+    private String receiverPhone;
+
+    @Column(name = "shipping_address", nullable = false)
+    private String shippingAddress;
+
     @PrePersist
     void onCreate() { createdAt = LocalDateTime.now(); }
 
     public Long getId() { return id; }
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
-    public Address getAddress() { return address; }
-    public void setAddress(Address address) { this.address = address; }
     public Promotion getPromotion() { return promotion; }
     public void setPromotion(Promotion promotion) { this.promotion = promotion; }
     public OrderStatus getStatus() { return status; }
@@ -62,8 +65,15 @@ public class Order {
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public PaymentMethod getPaymentMethod() {
-        return paymentMethod;}
+    public PaymentMethod getPaymentMethod() {return paymentMethod;}
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.paymentMethod = paymentMethod;
-    }}
+    }
+    public String getReceiverName() {return receiverName;}
+    public void setReceiverName(String receiverName) {this.receiverName = receiverName;}
+    public String getReceiverPhone() {return receiverPhone;}
+    public void setReceiverPhone(String receiverPhone) {this.receiverPhone = receiverPhone;}
+    public String getShippingAddress() {return shippingAddress;}
+    public void setShippingAddress(String shippingAddress) {this.shippingAddress = shippingAddress;
+    }
+}
