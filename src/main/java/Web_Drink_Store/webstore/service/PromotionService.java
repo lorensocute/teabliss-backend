@@ -9,6 +9,8 @@ public interface PromotionService {
 
     List<PromotionResponse> getAll();
 
+    PromotionResponse getById(Long id);
+
     PromotionResponse create(PromotionRequest request);
 
     PromotionResponse update(Long id, PromotionRequest request);

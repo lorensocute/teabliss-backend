@@ -4,6 +4,7 @@ import Web_Drink_Store.webstore.dto.address.AddressRequest;
 import Web_Drink_Store.webstore.dto.address.AddressResponse;
 import Web_Drink_Store.webstore.entity.Address;
 import Web_Drink_Store.webstore.entity.User;
+import Web_Drink_Store.webstore.exception.BadRequestException;
 import Web_Drink_Store.webstore.exception.ResourceNotFoundException;
 import Web_Drink_Store.webstore.repository.AddressRepository;
 import Web_Drink_Store.webstore.repository.UserRepository;
@@ -42,12 +43,20 @@ public class AddressServiceImpl implements AddressService {
             Long userId,
             AddressRequest request
     ) {
+        validateRequest(request);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Không tìm thấy người dùng"
                         )
                 );
+
+        // Nếu địa chỉ mới được chọn làm mặc định
+        // thì bỏ mặc định của các địa chỉ cũ
+        if (request.isDefaultAddress()) {
+            clearDefaultAddress(userId);
+        }
 
         Address address = new Address();
         address.setUser(user);
@@ -66,7 +75,16 @@ public class AddressServiceImpl implements AddressService {
             Long id,
             AddressRequest request
     ) {
+        validateRequest(request);
+
+        // Chỉ lấy địa chỉ thuộc user hiện tại
         Address address = getOwnedAddress(userId, id);
+
+        // Nếu chọn địa chỉ này làm mặc định
+        // thì bỏ mặc định của các địa chỉ khác
+        if (request.isDefaultAddress()) {
+            clearDefaultAddress(userId);
+        }
 
         updateFields(address, request);
 
@@ -83,7 +101,10 @@ public class AddressServiceImpl implements AddressService {
         addressRepository.delete(address);
     }
 
-    private Address getOwnedAddress(Long userId, Long addressId) {
+    private Address getOwnedAddress(
+            Long userId,
+            Long addressId
+    ) {
         return addressRepository
                 .findByIdAndUserId(addressId, userId)
                 .orElseThrow(() ->
@@ -93,17 +114,91 @@ public class AddressServiceImpl implements AddressService {
                 );
     }
 
+    private void clearDefaultAddress(Long userId) {
+        List<Address> defaultAddresses =
+                addressRepository
+                        .findByUserIdAndDefaultAddressTrue(userId);
+
+        for (Address address : defaultAddresses) {
+            address.setDefaultAddress(false);
+        }
+
+        addressRepository.saveAll(defaultAddresses);
+    }
+
+    private void validateRequest(AddressRequest request) {
+
+        if (request == null) {
+            throw new BadRequestException(
+                    "Thông tin địa chỉ không được để trống"
+            );
+        }
+
+        if (request.getReceiverName() == null
+                || request.getReceiverName().isBlank()) {
+            throw new BadRequestException(
+                    "Tên người nhận không được để trống"
+            );
+        }
+
+        if (request.getPhone() == null
+                || request.getPhone().isBlank()) {
+            throw new BadRequestException(
+                    "Số điện thoại không được để trống"
+            );
+        }
+
+        if (request.getAddressDetail() == null
+                || request.getAddressDetail().isBlank()) {
+            throw new BadRequestException(
+                    "Địa chỉ chi tiết không được để trống"
+            );
+        }
+    }
+
     private void updateFields(
             Address address,
             AddressRequest request
     ) {
-        address.setReceiverName(request.getReceiverName());
-        address.setPhone(request.getPhone());
-        address.setAddressDetail(request.getAddressDetail());
-        address.setWard(request.getWard());
-        address.setDistrict(request.getDistrict());
-        address.setCity(request.getCity());
-        address.setDefaultAddress(request.isDefaultAddress());
+        address.setReceiverName(
+                request.getReceiverName().trim()
+        );
+
+        address.setPhone(
+                request.getPhone().trim()
+        );
+
+        address.setAddressDetail(
+                request.getAddressDetail().trim()
+        );
+
+        address.setWard(
+                trimToNull(request.getWard())
+        );
+
+        address.setDistrict(
+                trimToNull(request.getDistrict())
+        );
+
+        address.setCity(
+                trimToNull(request.getCity())
+        );
+
+        address.setDefaultAddress(
+                request.isDefaultAddress()
+        );
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+
+        return trimmed.isEmpty()
+                ? null
+                : trimmed;
     }
 
     private AddressResponse mapToResponse(Address address) {

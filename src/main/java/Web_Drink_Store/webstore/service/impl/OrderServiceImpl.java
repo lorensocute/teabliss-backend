@@ -21,7 +21,6 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orders;
     private final OrderItemRepository orderItems;
     private final UserRepository users;
-    private final AddressRepository addresses;
     private final CartRepository carts;
     private final CartItemRepository cartItems;
     private final ProductRepository products;
@@ -31,7 +30,6 @@ public class OrderServiceImpl implements OrderService {
             OrderRepository orders,
             OrderItemRepository orderItems,
             UserRepository users,
-            AddressRepository addresses,
             CartRepository carts,
             CartItemRepository cartItems,
             ProductRepository products,
@@ -40,7 +38,6 @@ public class OrderServiceImpl implements OrderService {
         this.orders = orders;
         this.orderItems = orderItems;
         this.users = users;
-        this.addresses = addresses;
         this.carts = carts;
         this.cartItems = cartItems;
         this.products = products;
@@ -52,49 +49,97 @@ public class OrderServiceImpl implements OrderService {
     // =========================
     @Override
     @Transactional
-    public OrderResponse create(Long userId, OrderRequest request) {
+    public OrderResponse create(
+            Long userId,
+            OrderRequest request
+    ) {
 
         User user = users.findById(userId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy user"));
+                        new ResourceNotFoundException(
+                                "Không tìm thấy user"
+                        )
+                );
 
-        Address address = addresses.findById(request.getAddressId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy địa chỉ"));
+        // =========================
+        // KIỂM TRA THÔNG TIN GIAO HÀNG
+        // =========================
 
-        if (!address.getUser().getId().equals(userId)) {
-            throw new UnauthorizedException("Địa chỉ không thuộc user");
+        if (request.getReceiverName() == null
+                || request.getReceiverName().isBlank()) {
+
+            throw new BadRequestException(
+                    "Tên người nhận không được để trống"
+            );
         }
+
+        if (request.getReceiverPhone() == null
+                || request.getReceiverPhone().isBlank()) {
+
+            throw new BadRequestException(
+                    "Số điện thoại không được để trống"
+            );
+        }
+
+        if (request.getShippingAddress() == null
+                || request.getShippingAddress().isBlank()) {
+
+            throw new BadRequestException(
+                    "Địa chỉ giao hàng không được để trống"
+            );
+        }
+
+        // =========================
+        // LẤY GIỎ HÀNG
+        // =========================
 
         Cart cart = carts.findByUserId(userId)
                 .orElseThrow(() ->
-                        new BadRequestException("Giỏ hàng trống"));
+                        new BadRequestException(
+                                "Giỏ hàng trống"
+                        )
+                );
 
         List<CartItem> cartItemList =
-                cartItems.findByCartId(cart.getId());
+                cartItems.findByCartId(
+                        cart.getId()
+                );
 
         if (cartItemList.isEmpty()) {
-            throw new BadRequestException("Giỏ hàng trống");
+
+            throw new BadRequestException(
+                    "Giỏ hàng trống"
+            );
         }
 
         // =========================
         // TÍNH SUBTOTAL
         // =========================
+
         BigDecimal subtotal = BigDecimal.ZERO;
 
         for (CartItem cartItem : cartItemList) {
 
-            Product product = cartItem.getProduct();
+            Product product =
+                    cartItem.getProduct();
 
-            if (product.getStatus() != ProductStatus.ACTIVE) {
+            if (product.getStatus()
+                    != ProductStatus.ACTIVE) {
+
                 throw new BadRequestException(
-                        "Sản phẩm " + product.getName() + " không hoạt động"
+                        "Sản phẩm "
+                                + product.getName()
+                                + " không hoạt động"
                 );
             }
 
-            if (cartItem.getQuantity() > product.getStockQuantity()) {
+            if (cartItem.getQuantity()
+                    > product.getStockQuantity()) {
+
                 throw new BadRequestException(
-                        "Sản phẩm " + product.getName() + " không đủ hàng"
+                        "Sản phẩm "
+                                + product.getName()
+                                + " không đủ hàng"
                 );
             }
 
@@ -106,35 +151,50 @@ public class OrderServiceImpl implements OrderService {
                                     )
                             );
 
-            subtotal = subtotal.add(lineTotal);
+            subtotal =
+                    subtotal.add(lineTotal);
         }
 
         // =========================
         // XỬ LÝ PROMOTION
         // =========================
+
         Promotion promotion = null;
-        BigDecimal discount = BigDecimal.ZERO;
+        BigDecimal discount =
+                BigDecimal.ZERO;
 
         if (request.getPromotionCode() != null
-                && !request.getPromotionCode().isBlank()) {
+                && !request.getPromotionCode()
+                .isBlank()) {
 
-            promotion = promotions
-                    .findByCode(request.getPromotionCode().trim())
-                    .orElseThrow(() ->
-                            new BadRequestException(
-                                    "Mã khuyến mãi không hợp lệ"
-                            ));
+            promotion =
+                    promotions
+                            .findByCode(
+                                    request
+                                            .getPromotionCode()
+                                            .trim()
+                            )
+                            .orElseThrow(() ->
+                                    new BadRequestException(
+                                            "Mã khuyến mãi không hợp lệ"
+                                    )
+                            );
 
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now =
+                    LocalDateTime.now();
 
-            if (promotion.getStatus() != PromotionStatus.ACTIVE) {
+            if (promotion.getStatus()
+                    != PromotionStatus.ACTIVE) {
+
                 throw new BadRequestException(
                         "Khuyến mãi không còn hiệu lực"
                 );
             }
 
             if (promotion.getStartAt() != null
-                    && now.isBefore(promotion.getStartAt())) {
+                    && now.isBefore(
+                    promotion.getStartAt()
+            )) {
 
                 throw new BadRequestException(
                         "Khuyến mãi chưa bắt đầu"
@@ -142,7 +202,9 @@ public class OrderServiceImpl implements OrderService {
             }
 
             if (promotion.getEndAt() != null
-                    && now.isAfter(promotion.getEndAt())) {
+                    && now.isAfter(
+                    promotion.getEndAt()
+            )) {
 
                 throw new BadRequestException(
                         "Khuyến mãi đã hết hạn"
@@ -151,7 +213,8 @@ public class OrderServiceImpl implements OrderService {
 
             if (promotion.getMinOrderValue() != null
                     && subtotal.compareTo(
-                    promotion.getMinOrderValue()) < 0) {
+                    promotion.getMinOrderValue()
+            ) < 0) {
 
                 throw new BadRequestException(
                         "Chưa đạt giá trị đơn tối thiểu"
@@ -161,29 +224,39 @@ public class OrderServiceImpl implements OrderService {
             if (promotion.getDiscountType()
                     == DiscountType.PERCENT) {
 
-                discount = subtotal
-                        .multiply(promotion.getDiscountValue())
-                        .divide(
-                                BigDecimal.valueOf(100),
-                                2,
-                                RoundingMode.HALF_UP
-                        );
+                discount =
+                        subtotal
+                                .multiply(
+                                        promotion
+                                                .getDiscountValue()
+                                )
+                                .divide(
+                                        BigDecimal.valueOf(100),
+                                        2,
+                                        RoundingMode.HALF_UP
+                                );
 
             } else {
 
-                discount = promotion.getDiscountValue();
+                discount =
+                        promotion.getDiscountValue();
             }
 
-            // Giới hạn giảm tối đa
-            if (promotion.getMaxDiscountValue() != null
+            if (promotion.getMaxDiscountValue()
+                    != null
                     && discount.compareTo(
-                    promotion.getMaxDiscountValue()) > 0) {
+                    promotion
+                            .getMaxDiscountValue()
+            ) > 0) {
 
-                discount = promotion.getMaxDiscountValue();
+                discount =
+                        promotion
+                                .getMaxDiscountValue();
             }
 
-            // Không được giảm nhiều hơn giá trị đơn
+            // Không để tổng tiền âm
             if (discount.compareTo(subtotal) > 0) {
+
                 discount = subtotal;
             }
         }
@@ -191,15 +264,39 @@ public class OrderServiceImpl implements OrderService {
         // =========================
         // TẠO ORDER
         // =========================
+
         Order order = new Order();
 
         order.setUser(user);
-        order.setAddress(address);
         order.setPromotion(promotion);
-        order.setStatus(OrderStatus.PENDING);
-        order.setPaymentMethod(PaymentMethod.COD);
+
+        order.setStatus(
+                OrderStatus.PENDING
+        );
+
+        order.setPaymentMethod(
+                PaymentMethod.COD
+        );
+
+        // Snapshot thông tin giao hàng
+        order.setReceiverName(
+                request.getReceiverName().trim()
+        );
+
+        order.setReceiverPhone(
+                request.getReceiverPhone().trim()
+        );
+
+        order.setShippingAddress(
+                request.getShippingAddress().trim()
+        );
+
         order.setSubtotal(subtotal);
-        order.setDiscountAmount(discount);
+
+        order.setDiscountAmount(
+                discount
+        );
+
         order.setTotalAmount(
                 subtotal.subtract(discount)
         );
@@ -209,17 +306,26 @@ public class OrderServiceImpl implements OrderService {
         // =========================
         // TẠO ORDER ITEM
         // =========================
-        for (CartItem cartItem : cartItemList) {
 
-            Product product = cartItem.getProduct();
+        for (CartItem cartItem :
+                cartItemList) {
 
-            OrderItem orderItem = new OrderItem();
+            Product product =
+                    cartItem.getProduct();
+
+            OrderItem orderItem =
+                    new OrderItem();
 
             orderItem.setOrder(order);
-            orderItem.setProduct(product);
+
+            orderItem.setProduct(
+                    product
+            );
+
             orderItem.setQuantity(
                     cartItem.getQuantity()
             );
+
             orderItem.setUnitPrice(
                     product.getPrice()
             );
@@ -233,7 +339,9 @@ public class OrderServiceImpl implements OrderService {
                             )
             );
 
-            orderItems.save(orderItem);
+            orderItems.save(
+                    orderItem
+            );
 
             // Trừ tồn kho
             product.setStockQuantity(
@@ -247,42 +355,55 @@ public class OrderServiceImpl implements OrderService {
         // =========================
         // XÓA GIỎ HÀNG
         // =========================
-        cartItems.deleteByCartId(cart.getId());
+
+        cartItems.deleteByCartId(
+                cart.getId()
+        );
 
         return map(order);
     }
 
     // =========================
-    // USER XEM ĐƠN CỦA MÌNH
+    // USER XEM DANH SÁCH ORDER
     // =========================
     @Override
-    public List<OrderResponse> getMyOrders(Long userId) {
+    public List<OrderResponse> getMyOrders(
+            Long userId
+    ) {
 
         return orders
-                .findByUserIdOrderByCreatedAtDesc(userId)
+                .findByUserIdOrderByCreatedAtDesc(
+                        userId
+                )
                 .stream()
                 .map(this::map)
                 .toList();
     }
 
-// USER XEM CHI TIẾT ĐƠN HÀNG
-
+    // =========================
+    // USER XEM CHI TIẾT ORDER
+    // =========================
     @Override
     public OrderResponse getMyOrderById(
             Long userId,
             Long orderId
     ) {
 
-        Order order = orders
-                .findByIdAndUserId(orderId, userId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Không tìm thấy đơn hàng"
+        Order order =
+                orders
+                        .findByIdAndUserId(
+                                orderId,
+                                userId
                         )
-                );
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy đơn hàng"
+                                )
+                        );
 
         return map(order);
     }
+
     // =========================
     // ADMIN XEM TẤT CẢ ORDER
     // =========================
@@ -300,16 +421,26 @@ public class OrderServiceImpl implements OrderService {
     // ADMIN CẬP NHẬT TRẠNG THÁI
     // =========================
     @Override
+    @Transactional
     public OrderResponse updateStatus(
             Long id,
             OrderStatus newStatus
     ) {
 
-        Order order = orders.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Không tìm thấy order"
-                        ));
+        if (newStatus == null) {
+
+            throw new BadRequestException(
+                    "Trạng thái không được để trống"
+            );
+        }
+
+        Order order =
+                orders.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy order"
+                                )
+                        );
 
         OrderStatus currentStatus =
                 order.getStatus();
@@ -319,29 +450,44 @@ public class OrderServiceImpl implements OrderService {
         switch (currentStatus) {
 
             case PENDING:
+
                 valid =
-                        newStatus == OrderStatus.CONFIRMED
-                                || newStatus == OrderStatus.CANCELLED;
+                        newStatus
+                                == OrderStatus.CONFIRMED
+                                ||
+                                newStatus
+                                        == OrderStatus.CANCELLED;
+
                 break;
 
             case CONFIRMED:
+
                 valid =
-                        newStatus == OrderStatus.SHIPPING
-                                || newStatus == OrderStatus.CANCELLED;
+                        newStatus
+                                == OrderStatus.SHIPPING
+                                ||
+                                newStatus
+                                        == OrderStatus.CANCELLED;
+
                 break;
 
             case SHIPPING:
+
                 valid =
-                        newStatus == OrderStatus.COMPLETED;
+                        newStatus
+                                == OrderStatus.COMPLETED;
+
                 break;
 
             case COMPLETED:
             case CANCELLED:
+
                 valid = false;
                 break;
         }
 
         if (!valid) {
+
             throw new BadRequestException(
                     "Không thể chuyển trạng thái từ "
                             + currentStatus
@@ -350,7 +496,36 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        order.setStatus(newStatus);
+        // =========================
+        // CANCEL -> HOÀN TỒN KHO
+        // =========================
+
+        if (newStatus
+                == OrderStatus.CANCELLED) {
+
+            List<OrderItem> items =
+                    orderItems
+                            .findByOrderId(
+                                    order.getId()
+                            );
+
+            for (OrderItem item : items) {
+
+                Product product =
+                        item.getProduct();
+
+                product.setStockQuantity(
+                        product.getStockQuantity()
+                                + item.getQuantity()
+                );
+
+                products.save(product);
+            }
+        }
+
+        order.setStatus(
+                newStatus
+        );
 
         return map(
                 orders.save(order)
@@ -358,18 +533,24 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // =========================
-    // ENTITY -> RESPONSE DTO
+    // ENTITY -> RESPONSE
     // =========================
-    private OrderResponse map(Order order) {
+    private OrderResponse map(
+            Order order
+    ) {
 
         List<OrderItemResponse> items =
                 orderItems
-                        .findByOrderId(order.getId())
+                        .findByOrderId(
+                                order.getId()
+                        )
                         .stream()
                         .map(item ->
                                 new OrderItemResponse(
-                                        item.getProduct().getId(),
-                                        item.getProduct().getName(),
+                                        item.getProduct()
+                                                .getId(),
+                                        item.getProduct()
+                                                .getName(),
                                         item.getQuantity(),
                                         item.getUnitPrice(),
                                         item.getLineTotal()
@@ -381,10 +562,16 @@ public class OrderServiceImpl implements OrderService {
                 order.getId(),
                 order.getStatus(),
                 order.getPaymentMethod(),
+
+                order.getReceiverName(),
+                order.getReceiverPhone(),
+                order.getShippingAddress(),
+
                 order.getSubtotal(),
                 order.getDiscountAmount(),
                 order.getTotalAmount(),
                 order.getCreatedAt(),
+
                 items
         );
     }

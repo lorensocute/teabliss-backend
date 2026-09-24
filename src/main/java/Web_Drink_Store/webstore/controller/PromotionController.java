@@ -16,37 +16,48 @@ public class PromotionController {
 
     private final PromotionService service;
 
-    public PromotionController(PromotionService service) {
+    public PromotionController(
+            PromotionService service
+    ) {
         this.service = service;
     }
 
     private void admin(HttpSession session) {
 
-        System.out.println("PROMOTION SESSION ID = " + session.getId());
-        System.out.println("PROMOTION USER ID = " + session.getAttribute("userId"));
-        System.out.println("PROMOTION ROLE = " + session.getAttribute("role"));
+        if (!"ADMIN".equals(
+                session.getAttribute("role"))) {
 
-        Object role = session.getAttribute("role");
-
-        if (!"ADMIN".equals(role)) {
             throw new UnauthorizedException(
-                    "Cần quyền ADMIN. Role hiện tại: " + role
+                    "Cần quyền ADMIN"
             );
         }
     }
 
     @GetMapping
     public ApiResponse<List<PromotionResponse>> all() {
+
         return ApiResponse.ok(
                 "OK",
                 service.getAll()
         );
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<PromotionResponse> one(
+            @PathVariable Long id
+    ) {
+
+        return ApiResponse.ok(
+                "OK",
+                service.getById(id)
+        );
+    }
+
     @PostMapping
     public ApiResponse<PromotionResponse> create(
             @RequestBody PromotionRequest request,
-            HttpSession session) {
+            HttpSession session
+    ) {
 
         admin(session);
 
@@ -60,7 +71,8 @@ public class PromotionController {
     public ApiResponse<PromotionResponse> update(
             @PathVariable Long id,
             @RequestBody PromotionRequest request,
-            HttpSession session) {
+            HttpSession session
+    ) {
 
         admin(session);
 
@@ -70,10 +82,11 @@ public class PromotionController {
         );
     }
 
-    @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(
+    @PatchMapping("/{id}/status")
+    public ApiResponse<Void> updateStatus(
             @PathVariable Long id,
-            HttpSession session) {
+            HttpSession session
+    ) {
 
         admin(session);
 

@@ -7,7 +7,7 @@ import Web_Drink_Store.webstore.exception.UnauthorizedException;
 import Web_Drink_Store.webstore.service.UserService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
-
+import Web_Drink_Store.webstore.dto.user.ChangePasswordRequest;
 @RestController
 @RequestMapping("/api/profile")
 public class UserController {
@@ -47,6 +47,21 @@ public class UserController {
                         getUserId(session),
                         request
                 )
+        );
+    }
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            HttpSession session
+    ) {
+        userService.changePassword(
+                getUserId(session),
+                request
+        );
+
+        return ApiResponse.ok(
+                "Đổi mật khẩu thành công",
+                null
         );
     }
 }

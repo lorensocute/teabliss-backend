@@ -1,77 +1,282 @@
 package Web_Drink_Store.webstore.service.impl;
-import Web_Drink_Store.webstore.dto.cart.*; import Web_Drink_Store.webstore.entity.*; import Web_Drink_Store.webstore.enums.ProductStatus; import Web_Drink_Store.webstore.exception.*; import Web_Drink_Store.webstore.repository.*; import Web_Drink_Store.webstore.service.CartService; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.math.BigDecimal; import java.util.*;
+
+import Web_Drink_Store.webstore.dto.cart.CartItemRequest;
+import Web_Drink_Store.webstore.dto.cart.CartItemResponse;
+import Web_Drink_Store.webstore.dto.cart.CartResponse;
+import Web_Drink_Store.webstore.entity.Cart;
+import Web_Drink_Store.webstore.entity.CartItem;
+import Web_Drink_Store.webstore.entity.Product;
+import Web_Drink_Store.webstore.entity.User;
+import Web_Drink_Store.webstore.enums.ProductStatus;
+import Web_Drink_Store.webstore.exception.BadRequestException;
+import Web_Drink_Store.webstore.exception.ResourceNotFoundException;
+import Web_Drink_Store.webstore.exception.UnauthorizedException;
+import Web_Drink_Store.webstore.repository.CartItemRepository;
+import Web_Drink_Store.webstore.repository.CartRepository;
+import Web_Drink_Store.webstore.repository.ProductRepository;
+import Web_Drink_Store.webstore.repository.UserRepository;
+import Web_Drink_Store.webstore.service.CartService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+
 @Service
 public class CartServiceImpl implements CartService {
+
     private final CartRepository carts;
     private final CartItemRepository items;
     private final ProductRepository products;
     private final UserRepository users;
-    public CartServiceImpl(
-            CartRepository c,
-            CartItemRepository i,
-            ProductRepository p,
-            UserRepository u){
-        carts=c;items=i;products=p;users=u;}
-    private Cart cart(Long userId){
-        return carts.findByUserId(userId).orElseGet(() -> {User u=users.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
-            Cart c=new Cart();
-            c.setUser(u);
-            return carts.save(c);});}
-    private CartResponse map(Cart c){
-        List<CartItemResponse> rs=items.findByCartId(c.getId()).stream().map(i->{BigDecimal total=i.getProduct().getPrice().multiply(BigDecimal.valueOf(i.getQuantity()));
-            return new CartItemResponse(i.getId(),i.getProduct().getId(),i.getProduct().getName(),i.getProduct().getPrice(),i.getQuantity(),total);}).toList();
-        BigDecimal total=rs.stream().map(CartItemResponse::getLineTotal).reduce(BigDecimal.ZERO,BigDecimal::add);
-        return new CartResponse(c.getId(),rs,total);}
-    public CartResponse getCart(Long userId){
-        return map(cart(userId));}
-    @Transactional public CartResponse addItem(
-            Long userId,
-            CartItemRequest r){
-        if(r.getQuantity()==null||r.getQuantity()<=0)throw new BadRequestException("Số lượng phải > 0");
-        Cart c=cart(userId);
-        Product p=products.findById(r.getProductId()).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy product"));
-        if(p.getStatus()!=ProductStatus.ACTIVE)throw new BadRequestException("Sản phẩm không hoạt động");
-        CartItem item=items.findByCartIdAndProductId(c.getId(),p.getId()).orElseGet(CartItem::new);
-        int qty=item.getId()==null?r.getQuantity():item.getQuantity()+r.getQuantity(); if(qty>p.getStockQuantity())throw new BadRequestException("Vượt quá tồn kho");
-        item.setCart(c);
-        item.setProduct(p);
-        item.setQuantity(qty);
-        items.save(item);
-        c.touch();
-        carts.save(c);
 
-        return map(c);}
+    public CartServiceImpl(
+            CartRepository carts,
+            CartItemRepository items,
+            ProductRepository products,
+            UserRepository users
+    ) {
+        this.carts = carts;
+        this.items = items;
+        this.products = products;
+        this.users = users;
+    }
+
+    private Cart cart(Long userId) {
+        return carts.findByUserId(userId)
+                .orElseGet(() -> {
+
+                    User user = users.findById(userId)
+                            .orElseThrow(() ->
+                                    new ResourceNotFoundException(
+                                            "Không tìm thấy user"
+                                    )
+                            );
+
+                    Cart cart = new Cart();
+                    cart.setUser(user);
+
+                    return carts.save(cart);
+                });
+    }
+
+    private CartResponse map(Cart cart) {
+
+        List<CartItemResponse> responses =
+                items.findByCartId(cart.getId())
+                        .stream()
+                        .map(item -> {
+
+                            BigDecimal lineTotal =
+                                    item.getProduct()
+                                            .getPrice()
+                                            .multiply(
+                                                    BigDecimal.valueOf(
+                                                            item.getQuantity()
+                                                    )
+                                            );
+
+                            return new CartItemResponse(
+                                    item.getId(),
+                                    item.getProduct().getId(),
+                                    item.getProduct().getName(),
+                                    item.getProduct().getPrice(),
+                                    item.getQuantity(),
+                                    lineTotal
+                            );
+                        })
+                        .toList();
+
+        BigDecimal total = responses.stream()
+                .map(CartItemResponse::getLineTotal)
+                .reduce(
+                        BigDecimal.ZERO,
+                        BigDecimal::add
+                );
+
+        return new CartResponse(
+                cart.getId(),
+                responses,
+                total
+        );
+    }
+
+    @Override
+    public CartResponse getCart(Long userId) {
+        return map(cart(userId));
+    }
+
+    @Override
+    @Transactional
+    public CartResponse addItem(
+            Long userId,
+            CartItemRequest request
+    ) {
+
+        if (request.getQuantity() == null
+                || request.getQuantity() <= 0) {
+
+            throw new BadRequestException(
+                    "Số lượng phải > 0"
+            );
+        }
+
+        Cart cart = cart(userId);
+
+        Product product = products
+                .findById(request.getProductId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Không tìm thấy product"
+                        )
+                );
+
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new BadRequestException(
+                    "Sản phẩm không hoạt động"
+            );
+        }
+
+        CartItem item = items
+                .findByCartIdAndProductId(
+                        cart.getId(),
+                        product.getId()
+                )
+                .orElseGet(CartItem::new);
+
+        int quantity;
+
+        // Nếu chưa có sản phẩm trong giỏ
+        if (item.getId() == null) {
+            quantity = request.getQuantity();
+        } else {
+            // Nếu đã có thì cộng thêm số lượng
+            quantity = item.getQuantity()
+                    + request.getQuantity();
+        }
+
+        if (quantity > product.getStockQuantity()) {
+            throw new BadRequestException(
+                    "Vượt quá tồn kho"
+            );
+        }
+
+        item.setCart(cart);
+        item.setProduct(product);
+        item.setQuantity(quantity);
+
+        items.save(item);
+
+        cart.touch();
+        carts.save(cart);
+
+        return map(cart);
+    }
+
+    @Override
+    @Transactional
     public CartResponse updateItem(
             Long userId,
             Long itemId,
-            Integer quantity){
-        if(quantity==null||quantity<=0)throw new BadRequestException("Số lượng phải > 0");
-        Cart c=cart(userId);
-        CartItem i=items.findById(itemId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cart item"));
-        if(!i.getCart().getId().equals(c.getId()))throw new UnauthorizedException("Không có quyền");
-        if(quantity>i.getProduct().getStockQuantity())throw new BadRequestException("Vượt quá tồn kho");
-        i.setQuantity(quantity);
-        items.save(i);
-        c.touch();
-        carts.save(c);
+            Integer quantity
+    ) {
 
-        return map(c);}
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException(
+                    "Số lượng phải > 0"
+            );
+        }
+
+        Cart cart = cart(userId);
+
+        CartItem item = items.findById(itemId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Không tìm thấy cart item"
+                        )
+                );
+
+        // Không được sửa cart item của user khác
+        if (!item.getCart()
+                .getId()
+                .equals(cart.getId())) {
+
+            throw new UnauthorizedException(
+                    "Không có quyền"
+            );
+        }
+
+        // Product đã bị INACTIVE thì không được cập nhật
+        if (item.getProduct().getStatus()
+                != ProductStatus.ACTIVE) {
+
+            throw new BadRequestException(
+                    "Sản phẩm không hoạt động"
+            );
+        }
+
+        // Không được vượt tồn kho
+        if (quantity
+                > item.getProduct().getStockQuantity()) {
+
+            throw new BadRequestException(
+                    "Vượt quá tồn kho"
+            );
+        }
+
+        item.setQuantity(quantity);
+
+        items.save(item);
+
+        cart.touch();
+        carts.save(cart);
+
+        return map(cart);
+    }
+
+    @Override
+    @Transactional
     public CartResponse removeItem(
             Long userId,
-            Long itemId){
-        Cart c=cart(userId);
-        CartItem i=items.findById(itemId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cart item"));
-        if(!i.getCart().getId().equals(c.getId()))throw new UnauthorizedException("Không có quyền");
-        items.delete(i);
-        c.touch();
-        carts.save(c);
+            Long itemId
+    ) {
 
-        return map(c);}
-    @Transactional public void clear(Long userId){
-        Cart c = cart(userId);
+        Cart cart = cart(userId);
 
-        items.deleteByCartId(c.getId());
+        CartItem item = items.findById(itemId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Không tìm thấy cart item"
+                        )
+                );
 
-        c.touch();
-        carts.save(c);}
+        // Không được xóa cart item của user khác
+        if (!item.getCart()
+                .getId()
+                .equals(cart.getId())) {
+
+            throw new UnauthorizedException(
+                    "Không có quyền"
+            );
+        }
+
+        items.delete(item);
+
+        cart.touch();
+        carts.save(cart);
+
+        return map(cart);
+    }
+
+    @Override
+    @Transactional
+    public void clear(Long userId) {
+
+        Cart cart = cart(userId);
+
+        items.deleteByCartId(cart.getId());
+
+        cart.touch();
+        carts.save(cart);
+    }
 }

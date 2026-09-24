@@ -17,7 +17,9 @@ public class PromotionServiceImpl implements PromotionService {
 
     private final PromotionRepository promotionRepository;
 
-    public PromotionServiceImpl(PromotionRepository promotionRepository) {
+    public PromotionServiceImpl(
+            PromotionRepository promotionRepository
+    ) {
         this.promotionRepository = promotionRepository;
     }
 
@@ -30,14 +32,37 @@ public class PromotionServiceImpl implements PromotionService {
     }
 
     @Override
-    public PromotionResponse create(PromotionRequest request) {
+    public PromotionResponse getById(Long id) {
 
-        if (request.getCode() == null || request.getCode().isBlank()) {
-            throw new BadRequestException("Mã khuyến mãi không được để trống");
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Không tìm thấy khuyến mãi"
+                        )
+                );
+
+        return toResponse(promotion);
+    }
+
+    @Override
+    public PromotionResponse create(
+            PromotionRequest request
+    ) {
+
+        if (request.getCode() == null
+                || request.getCode().isBlank()) {
+
+            throw new BadRequestException(
+                    "Mã khuyến mãi không được để trống"
+            );
         }
 
-        if (promotionRepository.existsByCode(request.getCode())) {
-            throw new BadRequestException("Mã khuyến mãi đã tồn tại");
+        if (promotionRepository.existsByCode(
+                request.getCode())) {
+
+            throw new BadRequestException(
+                    "Mã khuyến mãi đã tồn tại"
+            );
         }
 
         validate(request);
@@ -46,10 +71,18 @@ public class PromotionServiceImpl implements PromotionService {
 
         promotion.setCode(request.getCode());
         promotion.setName(request.getName());
-        promotion.setDiscountType(request.getDiscountType());
-        promotion.setDiscountValue(request.getDiscountValue());
-        promotion.setMinOrderValue(request.getMinOrderValue());
-        promotion.setMaxDiscountValue(request.getMaxDiscountValue());
+        promotion.setDiscountType(
+                request.getDiscountType()
+        );
+        promotion.setDiscountValue(
+                request.getDiscountValue()
+        );
+        promotion.setMinOrderValue(
+                request.getMinOrderValue()
+        );
+        promotion.setMaxDiscountValue(
+                request.getMaxDiscountValue()
+        );
         promotion.setStartAt(request.getStartAt());
         promotion.setEndAt(request.getEndAt());
         promotion.setStatus(PromotionStatus.ACTIVE);
@@ -60,21 +93,37 @@ public class PromotionServiceImpl implements PromotionService {
     }
 
     @Override
-    public PromotionResponse update(Long id, PromotionRequest request) {
+    public PromotionResponse update(
+            Long id,
+            PromotionRequest request
+    ) {
 
-        Promotion promotion = promotionRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy khuyến mãi"));
+        Promotion promotion =
+                promotionRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy khuyến mãi"
+                                )
+                        );
 
-        if (request.getCode() == null || request.getCode().isBlank()) {
-            throw new BadRequestException("Mã khuyến mãi không được để trống");
+        if (request.getCode() == null
+                || request.getCode().isBlank()) {
+
+            throw new BadRequestException(
+                    "Mã khuyến mãi không được để trống"
+            );
         }
 
-        promotionRepository.findByCode(request.getCode())
+        promotionRepository.findByCode(
+                        request.getCode()
+                )
                 .ifPresent(existing -> {
+
                     if (!existing.getId().equals(id)) {
+
                         throw new BadRequestException(
-                                "Mã khuyến mãi đã tồn tại");
+                                "Mã khuyến mãi đã tồn tại"
+                        );
                     }
                 });
 
@@ -82,10 +131,18 @@ public class PromotionServiceImpl implements PromotionService {
 
         promotion.setCode(request.getCode());
         promotion.setName(request.getName());
-        promotion.setDiscountType(request.getDiscountType());
-        promotion.setDiscountValue(request.getDiscountValue());
-        promotion.setMinOrderValue(request.getMinOrderValue());
-        promotion.setMaxDiscountValue(request.getMaxDiscountValue());
+        promotion.setDiscountType(
+                request.getDiscountType()
+        );
+        promotion.setDiscountValue(
+                request.getDiscountValue()
+        );
+        promotion.setMinOrderValue(
+                request.getMinOrderValue()
+        );
+        promotion.setMaxDiscountValue(
+                request.getMaxDiscountValue()
+        );
         promotion.setStartAt(request.getStartAt());
         promotion.setEndAt(request.getEndAt());
 
@@ -97,46 +154,65 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     public void deactivate(Long id) {
 
-        Promotion promotion = promotionRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy khuyến mãi"));
+        Promotion promotion =
+                promotionRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy khuyến mãi"
+                                )
+                        );
 
-        promotion.setStatus(PromotionStatus.INACTIVE);
+        promotion.setStatus(
+                PromotionStatus.INACTIVE
+        );
 
         promotionRepository.save(promotion);
     }
 
-    private void validate(PromotionRequest request) {
+    private void validate(
+            PromotionRequest request
+    ) {
 
-        if (request.getName() == null || request.getName().isBlank()) {
+        if (request.getName() == null
+                || request.getName().isBlank()) {
+
             throw new BadRequestException(
-                    "Tên khuyến mãi không được để trống");
+                    "Tên khuyến mãi không được để trống"
+            );
         }
 
         if (request.getDiscountType() == null) {
+
             throw new BadRequestException(
-                    "Loại giảm giá không được để trống");
+                    "Loại giảm giá không được để trống"
+            );
         }
 
         if (request.getDiscountValue() == null
-                || request.getDiscountValue().signum() <= 0) {
+                || request.getDiscountValue()
+                .signum() <= 0) {
 
             throw new BadRequestException(
-                    "Giá trị giảm phải lớn hơn 0");
+                    "Giá trị giảm phải lớn hơn 0"
+            );
         }
 
         if (request.getMinOrderValue() != null
-                && request.getMinOrderValue().signum() < 0) {
+                && request.getMinOrderValue()
+                .signum() < 0) {
 
             throw new BadRequestException(
-                    "Giá trị đơn hàng tối thiểu không được âm");
+                    "Giá trị đơn hàng tối thiểu không được âm"
+            );
         }
 
         if (request.getMaxDiscountValue() != null
-                && request.getMaxDiscountValue().signum() < 0) {
+                && request.getMaxDiscountValue()
+                .signum() < 0) {
 
             throw new BadRequestException(
-                    "Mức giảm tối đa không được âm");
+                    "Mức giảm tối đa không được âm"
+            );
         }
 
         if (request.getStartAt() != null
@@ -145,11 +221,14 @@ public class PromotionServiceImpl implements PromotionService {
                 .isBefore(request.getStartAt())) {
 
             throw new BadRequestException(
-                    "Thời gian kết thúc phải sau thời gian bắt đầu");
+                    "Thời gian kết thúc phải sau thời gian bắt đầu"
+            );
         }
     }
 
-    private PromotionResponse toResponse(Promotion promotion) {
+    private PromotionResponse toResponse(
+            Promotion promotion
+    ) {
 
         return new PromotionResponse(
                 promotion.getId(),

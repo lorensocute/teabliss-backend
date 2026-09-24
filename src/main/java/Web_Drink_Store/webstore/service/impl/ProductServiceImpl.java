@@ -1,14 +1,19 @@
 package Web_Drink_Store.webstore.service.impl;
 
-import Web_Drink_Store.webstore.dto.product.*;
-import Web_Drink_Store.webstore.entity.*;
+import Web_Drink_Store.webstore.dto.product.ProductRequest;
+import Web_Drink_Store.webstore.dto.product.ProductResponse;
+import Web_Drink_Store.webstore.entity.Category;
+import Web_Drink_Store.webstore.entity.Product;
+import Web_Drink_Store.webstore.enums.CategoryStatus;
 import Web_Drink_Store.webstore.enums.ProductStatus;
-import Web_Drink_Store.webstore.exception.*;
-import Web_Drink_Store.webstore.repository.*;
+import Web_Drink_Store.webstore.exception.BadRequestException;
+import Web_Drink_Store.webstore.exception.ResourceNotFoundException;
+import Web_Drink_Store.webstore.repository.CategoryRepository;
+import Web_Drink_Store.webstore.repository.ProductRepository;
 import Web_Drink_Store.webstore.service.ProductService;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -16,15 +21,21 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository repo;
     private final CategoryRepository categories;
 
-    public ProductServiceImpl(ProductRepository r, CategoryRepository c) {
-        repo = r;
-        categories = c;
+    public ProductServiceImpl(
+            ProductRepository repo,
+            CategoryRepository categories
+    ) {
+        this.repo = repo;
+        this.categories = categories;
     }
 
     private Product get(Long id) {
         return repo.findById(id)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Không tìm thấy product"));
+                        new ResourceNotFoundException(
+                                "Không tìm thấy product"
+                        )
+                );
     }
 
     private ProductResponse map(Product p) {
@@ -43,6 +54,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> getActive(Long categoryId) {
+
         List<Product> list = categoryId == null
                 ? repo.findByStatus(ProductStatus.ACTIVE)
                 : repo.findByCategoryIdAndStatus(
@@ -56,7 +68,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public List<ProductResponse> search(String keyword, Long categoryId) {
+    public List<ProductResponse> search(
+            String keyword,
+            Long categoryId
+    ) {
 
         if (keyword != null && keyword.isBlank()) {
             keyword = null;
@@ -78,56 +93,79 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public ProductResponse create(ProductRequest r) {
-        Product p = new Product();
+    public ProductResponse create(ProductRequest request) {
 
-        fill(p, r);
-        p.setStatus(ProductStatus.ACTIVE);
+        Product product = new Product();
 
-        return map(repo.save(p));
+        fill(product, request);
+
+        product.setStatus(ProductStatus.ACTIVE);
+
+        return map(repo.save(product));
     }
 
     @Override
-    public ProductResponse update(Long id, ProductRequest r) {
-        Product p = get(id);
+    public ProductResponse update(
+            Long id,
+            ProductRequest request
+    ) {
 
-        fill(p, r);
+        Product product = get(id);
 
-        return map(repo.save(p));
+        fill(product, request);
+
+        return map(repo.save(product));
     }
 
     @Override
     public void deactivate(Long id) {
-        Product p = get(id);
 
-        p.setStatus(ProductStatus.INACTIVE);
+        Product product = get(id);
 
-        repo.save(p);
+        product.setStatus(ProductStatus.INACTIVE);
+
+        repo.save(product);
     }
 
-    private void fill(Product p, ProductRequest r) {
+    private void fill(
+            Product product,
+            ProductRequest request
+    ) {
 
-        if (r.getPrice() == null
-                || r.getPrice().signum() < 0
-                || r.getStockQuantity() == null
-                || r.getStockQuantity() < 0) {
+        // Kiểm tra giá và số lượng tồn kho
+        if (request.getPrice() == null
+                || request.getPrice().signum() < 0
+                || request.getStockQuantity() == null
+                || request.getStockQuantity() < 0) {
 
             throw new BadRequestException(
                     "Giá hoặc tồn kho không hợp lệ"
             );
         }
 
-        Category c = categories.findById(r.getCategoryId())
+        // Kiểm tra category có tồn tại không
+        Category category = categories
+                .findById(request.getCategoryId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Không tìm thấy category"
-                        ));
+                        )
+                );
 
-        p.setName(r.getName());
-        p.setDescription(r.getDescription());
-        p.setImageUrl(r.getImageUrl());
-        p.setPrice(r.getPrice());
-        p.setStockQuantity(r.getStockQuantity());
-        p.setCategory(c);
+        // Không cho Product thuộc Category đã INACTIVE
+        if (category.getStatus() != CategoryStatus.ACTIVE) {
+            throw new BadRequestException(
+                    "Category không hoạt động"
+            );
+        }
+
+        product.setName(request.getName());
+        product.setDescription(request.getDescription());
+        product.setImageUrl(request.getImageUrl());
+        product.setPrice(request.getPrice());
+        product.setStockQuantity(
+                request.getStockQuantity()
+        );
+        product.setCategory(category);
     }
 }
